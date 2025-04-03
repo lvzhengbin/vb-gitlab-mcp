@@ -20,6 +20,7 @@ import {
   GitLabMergeRequestDiffSchema,
   GetMergeRequestSchema,
   GetMergeRequestDiffsSchema,
+  CodeReviewReportSchema,
   type GitLabRepository,
   type GitLabMergeRequest,
   type GitLabSearchResponse,
@@ -230,6 +231,33 @@ async function getMergeRequestDiffs(
   return z.array(GitLabMergeRequestDiffSchema).parse(data.changes);
 }
 
+/**
+ * Save code review report as HTML file
+ * 
+ * @param {string} projectId - The ID or URL-encoded path of the project
+ * @param {number} mergeRequestIid - The internal ID of the merge request
+ * @param {string} reportContent - The HTML content of the report
+ * @param {string} outputFile - The path where to save the HTML file
+ * @returns {Promise<string>} The path where the file was saved
+ */
+async function saveCodeReviewReport(
+  projectId: string,
+  mergeRequestIid: number,
+  reportContent: string,
+  outputFile: string
+): Promise<string> {
+  // Ensure the directory exists
+  const dir = path.dirname(outputFile);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  // Write the HTML file
+  fs.writeFileSync(outputFile, reportContent, 'utf8');
+  
+  return outputFile;
+}
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -247,6 +275,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "get_merge_request_diffs",
         description: "Get the changes/diffs of a merge request",
         inputSchema: zodToJsonSchema(GetMergeRequestDiffsSchema),
+      },
+      {
+        name: "report_code_review_results",
+        description: "Save code review results as an HTML file locally",
+        inputSchema: zodToJsonSchema(CodeReviewReportSchema),
       },
     ],
   };
@@ -292,6 +325,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
         return {
           content: [{ type: "text", text: JSON.stringify(diffs, null, 2) }],
+        };
+      }
+
+      case "report_code_review_results": {
+        const args = CodeReviewReportSchema.parse(request.params.arguments);
+        const savedPath = await saveCodeReviewReport(
+          args.project_id,
+          args.merge_request_iid,
+          args.report_content,
+          args.output_file
+        );
+        return {
+          content: [
+            { type: "text", text: `Code review report saved to: ${savedPath}` },
+          ],
         };
       }
 

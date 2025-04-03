@@ -278,6 +278,18 @@ export const GetProjectSchema = z.object({
   project_id: z.string().describe("Project ID or URL-encoded path"),
 });
 
+
+/**
+ * Schema for code review report
+ */
+export const CodeReviewReportSchema = z.object({
+  project_id: z.string().describe("Project ID or URL-encoded path"),
+  merge_request_iid: z.number().describe("The internal ID of the merge request"),
+  report_content: z.string().describe("The HTML content of the code review report"),
+  output_file: z.string().describe("The path where the HTML report will be saved"),
+});
+
+
 // Export types
 export type GitLabAuthor = z.infer<typeof GitLabAuthorSchema>;
 
