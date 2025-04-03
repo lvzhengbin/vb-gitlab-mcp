@@ -20,7 +20,6 @@ import {
   GitLabMergeRequestDiffSchema,
   GetMergeRequestSchema,
   GetMergeRequestDiffsSchema,
-  UpdateMergeRequestSchema,
   type GitLabRepository,
   type GitLabMergeRequest,
   type GitLabSearchResponse,
@@ -231,38 +230,6 @@ async function getMergeRequestDiffs(
   return z.array(GitLabMergeRequestDiffSchema).parse(data.changes);
 }
 
-/**
- * Update a merge request
- *
- * @param {string} projectId - The ID or URL-encoded path of the project
- * @param {number} mergeRequestIid - The internal ID of the merge request
- * @param {Object} options - The update options
- * @returns {Promise<GitLabMergeRequest>} The updated merge request
- */
-async function updateMergeRequest(
-  projectId: string,
-  mergeRequestIid: number,
-  options: Omit<
-    z.infer<typeof UpdateMergeRequestSchema>,
-    "project_id" | "merge_request_iid"
-  >
-): Promise<GitLabMergeRequest> {
-  const url = new URL(
-    `${GITLAB_API_URL}/projects/${encodeURIComponent(
-      projectId
-    )}/merge_requests/${mergeRequestIid}`
-  );
-
-  const response = await fetch(url.toString(), {
-    method: "PUT",
-    headers: DEFAULT_HEADERS,
-    body: JSON.stringify(options),
-  });
-
-  await handleGitLabError(response);
-  return GitLabMergeRequestSchema.parse(await response.json());
-}
-
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -280,11 +247,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "get_merge_request_diffs",
         description: "Get the changes/diffs of a merge request",
         inputSchema: zodToJsonSchema(GetMergeRequestDiffsSchema),
-      },
-      {
-        name: "update_merge_request",
-        description: "Update a merge request",
-        inputSchema: zodToJsonSchema(UpdateMergeRequestSchema),
       },
     ],
   };
@@ -330,21 +292,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
         return {
           content: [{ type: "text", text: JSON.stringify(diffs, null, 2) }],
-        };
-      }
-
-      case "update_merge_request": {
-        const args = UpdateMergeRequestSchema.parse(request.params.arguments);
-        const { project_id, merge_request_iid, ...options } = args;
-        const mergeRequest = await updateMergeRequest(
-          project_id,
-          merge_request_iid,
-          options
-        );
-        return {
-          content: [
-            { type: "text", text: JSON.stringify(mergeRequest, null, 2) },
-          ],
         };
       }
 
