@@ -1,5 +1,5 @@
 {
-  "name": "@vb/gitlab-mcp",
+  "name": "@vocalbeats/gitlab-mcp",
   "version": "1.0.0",
   "description": "MCP server for using the GitLab API",
   "license": "MIT",
