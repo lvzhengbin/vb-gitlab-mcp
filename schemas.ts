@@ -289,6 +289,46 @@ export const CodeReviewReportSchema = z.object({
   output_file: z.string().describe("The path where the HTML report will be saved"),
 });
 
+/**
+ * Schema for getting commit diff
+ */
+export const GetCommitDiffSchema = z.object({
+  project_id: z.string().describe("Project ID or URL-encoded path"),
+  commit_sha: z.string().describe("The commit SHA hash"),
+});
+
+/**
+ * Schema for commit data
+ */
+export const GitLabCommitSchema = z.object({
+  id: z.string(),
+  short_id: z.string(),
+  title: z.string(),
+  author_name: z.string(),
+  author_email: z.string(),
+  authored_date: z.string(),
+  committer_name: z.string(),
+  committer_email: z.string(),
+  committed_date: z.string(),
+  created_at: z.string(),
+  message: z.string(),
+  parent_ids: z.array(z.string()),
+  web_url: z.string(),
+  trailers: z.record(z.string()).optional(),
+  extended_trailers: z.record(z.union([z.string(), z.array(z.string())])).optional(),
+});
+
+/**
+ * Schema for listing repository commits
+ */
+export const ListRepositoryCommitsSchema = z.object({
+  project_id: z.string().describe("Project ID or URL-encoded path"),
+  ref_name: z.string().optional().describe("The name of a repository branch, tag or revision range"),
+  since: z.string().optional().describe("Only commits after or on this date (ISO 8601 format)"),
+  until: z.string().optional().describe("Only commits before or on this date (ISO 8601 format)"),
+  author: z.string().optional().describe("Search commits by author"),
+  all: z.boolean().optional().default(true).describe("Retrieve every commit from the repository"),
+});
 
 // Export types
 export type GitLabAuthor = z.infer<typeof GitLabAuthorSchema>;
@@ -306,3 +346,4 @@ export type GitLabRepository = z.infer<typeof GitLabRepositorySchema>;
 export type GitLabMergeRequest = z.infer<typeof GitLabMergeRequestSchema>;
 export type GitLabSearchResponse = z.infer<typeof GitLabSearchResponseSchema>;
 export type GitLabMergeRequestDiff = z.infer<typeof GitLabMergeRequestDiffSchema>;
+export type GitLabCommit = z.infer<typeof GitLabCommitSchema>;

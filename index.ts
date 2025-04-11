@@ -21,10 +21,14 @@ import {
   GetMergeRequestSchema,
   GetMergeRequestDiffsSchema,
   CodeReviewReportSchema,
+  GetCommitDiffSchema,
+  ListRepositoryCommitsSchema,
+  GitLabCommitSchema,
   type GitLabRepository,
   type GitLabMergeRequest,
   type GitLabSearchResponse,
   type GitLabMergeRequestDiff,
+  type GitLabCommit,
 } from "./schemas.js";
 
 /**
@@ -232,6 +236,31 @@ async function getMergeRequestDiffs(
 }
 
 /**
+ * Get commit diffs
+ *
+ * @param {string} projectId - The ID or URL-encoded path of the project
+ * @param {string} commitSha - The commit SHA hash
+ * @returns {Promise<GitLabMergeRequestDiff[]>} The commit diffs
+ */
+async function getCommitDiff(
+  projectId: string,
+  commitSha: string
+): Promise<GitLabMergeRequestDiff[]> {
+  const url = new URL(
+    `${GITLAB_API_URL}/projects/${encodeURIComponent(
+      projectId
+    )}/repository/commits/${commitSha}/diff`
+  );
+
+  const response = await fetch(url.toString(), {
+    headers: DEFAULT_HEADERS,
+  });
+
+  await handleGitLabError(response);
+  return z.array(GitLabMergeRequestDiffSchema).parse(await response.json());
+}
+
+/**
  * Save code review report as HTML file
  * 
  * @param {string} projectId - The ID or URL-encoded path of the project
@@ -258,6 +287,57 @@ async function saveCodeReviewReport(
   return outputFile;
 }
 
+/**
+ * Get a list of repository commits in a project
+ *
+ * @param {string} projectId - The ID or URL-encoded path of the project
+ * @param {Object} options - Optional parameters
+ * @param {string} [options.refName] - The name of a repository branch, tag or revision range
+ * @param {string} [options.since] - Only commits after or on this date (ISO 8601 format)
+ * @param {string} [options.until] - Only commits before or on this date (ISO 8601 format)
+ * @param {string} [options.author] - Search commits by author
+ * @param {boolean} [options.all] - Retrieve every commit from the repository
+ * @returns {Promise<GitLabCommit[]>} List of commits
+ */
+async function listRepositoryCommits(
+  projectId: string,
+  options: {
+    refName?: string;
+    since?: string;
+    until?: string;
+    author?: string;
+    all?: boolean;
+  } = {}
+): Promise<GitLabCommit[]> {
+  const url = new URL(
+    `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/commits`
+  );
+
+  // Add optional parameters
+  if (options.refName) {
+    url.searchParams.append("ref_name", options.refName);
+  }
+  if (options.since) {
+    url.searchParams.append("since", options.since);
+  }
+  if (options.until) {
+    url.searchParams.append("until", options.until);
+  }
+  if (options.author) {
+    url.searchParams.append("author", options.author);
+  }
+  if (options.all !== undefined) {
+    url.searchParams.append("all", options.all.toString());
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: DEFAULT_HEADERS,
+  });
+
+  await handleGitLabError(response);
+  return z.array(GitLabCommitSchema).parse(await response.json());
+}
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -275,6 +355,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "get_merge_request_diffs",
         description: "Get the changes/diffs of a merge request",
         inputSchema: zodToJsonSchema(GetMergeRequestDiffsSchema),
+      },
+      {
+        name: "list_repository_commits",
+        description: "Get a list of repository commits in a project",
+        inputSchema: zodToJsonSchema(ListRepositoryCommitsSchema),
+      },
+      {
+        name: "get_commit_diff",
+        description: "Get the diff of a commit",
+        inputSchema: zodToJsonSchema(GetCommitDiffSchema),
       },
       {
         name: "report_code_review_results",
@@ -325,6 +415,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
         return {
           content: [{ type: "text", text: JSON.stringify(diffs, null, 2) }],
+        };
+      }
+
+      case "get_commit_diff": {
+        const args = GetCommitDiffSchema.parse(request.params.arguments);
+        const diffs = await getCommitDiff(
+          args.project_id,
+          args.commit_sha
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(diffs, null, 2) }],
+        };
+      }
+
+      case "list_repository_commits": {
+        const args = ListRepositoryCommitsSchema.parse(request.params.arguments);
+        const commits = await listRepositoryCommits(
+          args.project_id,
+          {
+            refName: args.ref_name,
+            since: args.since,
+            until: args.until,
+            author: args.author,
+            all: args.all
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(commits, null, 2) }],
         };
       }
 
